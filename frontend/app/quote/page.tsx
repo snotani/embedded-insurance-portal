@@ -71,14 +71,56 @@ export default function QuotePage() {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   const handleQuoteInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setQuoteData({ ...quoteData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    let formattedValue = value;
+
+    // Format phone number
+    if (name === 'phone') {
+      formattedValue = value.replace(/[^\d+\-() ]/g, '');
+    }
+
+    // Format ZIP code
+    if (name === 'zipCode') {
+      formattedValue = value.replace(/[^\d-]/g, '').slice(0, 10);
+    }
+
+    // Format vehicle year
+    if (name === 'vehicleYear') {
+      formattedValue = value.replace(/[^\d]/g, '').slice(0, 4);
+    }
+
+    setQuoteData({ ...quoteData, [name]: formattedValue });
   };
 
   const handlePaymentInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPaymentData({ ...paymentData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    let formattedValue = value;
+
+    // Format card number (digits only)
+    if (name === 'cardNumber') {
+      formattedValue = value.replace(/[^\d]/g, '').slice(0, 16);
+    }
+
+    // Format expiration month (2 digits)
+    if (name === 'cardExpMonth') {
+      formattedValue = value.replace(/[^\d]/g, '').slice(0, 2);
+    }
+
+    // Format expiration year (4 digits)
+    if (name === 'cardExpYear') {
+      formattedValue = value.replace(/[^\d]/g, '').slice(0, 4);
+    }
+
+    // Format CVV (3-4 digits)
+    if (name === 'cardCvv') {
+      formattedValue = value.replace(/[^\d]/g, '').slice(0, 4);
+    }
+
+    setPaymentData({ ...paymentData, [name]: formattedValue });
   };
 
   const validateSection1 = () => {
+    // Check required fields
     if (!quoteData.firstName || !quoteData.lastName || !quoteData.email || 
         !quoteData.phone || !quoteData.street || !quoteData.city || 
         !quoteData.state || !quoteData.zipCode || !quoteData.vehicleYear || 
@@ -86,16 +128,84 @@ export default function QuotePage() {
       setError('Please fill in all required fields');
       return false;
     }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(quoteData.email)) {
+      setError('Please enter a valid email address');
+      return false;
+    }
+
+    // Validate phone format (basic check for digits)
+    const phoneRegex = /^\+?[\d\s\-()]{10,}$/;
+    if (!phoneRegex.test(quoteData.phone)) {
+      setError('Please enter a valid phone number (at least 10 digits)');
+      return false;
+    }
+
+    // Validate ZIP code (5 or 9 digits)
+    const zipRegex = /^\d{5}(-\d{4})?$/;
+    if (!zipRegex.test(quoteData.zipCode)) {
+      setError('Please enter a valid ZIP code (e.g., 12345 or 12345-6789)');
+      return false;
+    }
+
+    // Validate vehicle year
+    const currentYear = new Date().getFullYear();
+    const year = parseInt(quoteData.vehicleYear);
+    if (isNaN(year) || year < 1900 || year > currentYear + 1) {
+      setError(`Please enter a valid vehicle year (1900-${currentYear + 1})`);
+      return false;
+    }
+
     setError('');
     return true;
   };
 
   const validateSection2 = () => {
+    // Check required fields
     if (!paymentData.cardNumber || !paymentData.cardExpMonth || 
         !paymentData.cardExpYear || !paymentData.cardCvv) {
       setError('Please fill in all payment fields');
       return false;
     }
+
+    // Validate card number (13-19 digits)
+    const cardRegex = /^\d{13,19}$/;
+    if (!cardRegex.test(paymentData.cardNumber.replace(/\s/g, ''))) {
+      setError('Please enter a valid card number (13-19 digits)');
+      return false;
+    }
+
+    // Validate expiration month (01-12)
+    const month = parseInt(paymentData.cardExpMonth);
+    if (isNaN(month) || month < 1 || month > 12) {
+      setError('Please enter a valid expiration month (01-12)');
+      return false;
+    }
+
+    // Validate expiration year (current year or future)
+    const currentYear = new Date().getFullYear();
+    const year = parseInt(paymentData.cardExpYear);
+    if (isNaN(year) || year < currentYear || year > currentYear + 20) {
+      setError(`Please enter a valid expiration year (${currentYear}-${currentYear + 20})`);
+      return false;
+    }
+
+    // Check if card is expired
+    const currentMonth = new Date().getMonth() + 1;
+    if (year === currentYear && month < currentMonth) {
+      setError('Card has expired. Please use a valid card');
+      return false;
+    }
+
+    // Validate CVV (3-4 digits)
+    const cvvRegex = /^\d{3,4}$/;
+    if (!cvvRegex.test(paymentData.cardCvv)) {
+      setError('Please enter a valid CVV (3-4 digits)');
+      return false;
+    }
+
     setError('');
     return true;
   };
@@ -263,6 +373,7 @@ export default function QuotePage() {
                     name="email"
                     value={quoteData.email}
                     onChange={handleQuoteInputChange}
+                    placeholder="john@example.com"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                     required
                   />
@@ -274,6 +385,7 @@ export default function QuotePage() {
                     name="phone"
                     value={quoteData.phone}
                     onChange={handleQuoteInputChange}
+                    placeholder="(555) 123-4567"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                     required
                   />
@@ -324,6 +436,7 @@ export default function QuotePage() {
                     name="zipCode"
                     value={quoteData.zipCode}
                     onChange={handleQuoteInputChange}
+                    placeholder="12345"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                     required
                   />
@@ -336,10 +449,11 @@ export default function QuotePage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Year *</label>
                   <input
-                    type="number"
+                    type="text"
                     name="vehicleYear"
                     value={quoteData.vehicleYear}
                     onChange={handleQuoteInputChange}
+                    placeholder="2024"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                     required
                   />
