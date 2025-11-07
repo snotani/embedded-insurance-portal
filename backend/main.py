@@ -4,6 +4,7 @@ FastAPI Backend for Root Insurance Integration
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, EmailStr, Field, validator
 from typing import Optional, Literal
 from decimal import Decimal
@@ -124,9 +125,10 @@ class RootAPIClient:
     def __init__(self):
         self.api_key = os.getenv("ROOT_API_KEY")
         self.base_url = os.getenv("ROOT_API_BASE_URL", "https://sandbox.root.co.za/v1/insurance")
+        self.mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
         
-        if not self.api_key:
-            raise ValueError("ROOT_API_KEY environment variable is required")
+        if not self.api_key and not self.mock_mode:
+            raise ValueError("ROOT_API_KEY environment variable is required (or set MOCK_MODE=true for testing)")
         
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -371,6 +373,26 @@ async def health_check():
 # ============================================================================
 # Error Handlers
 # ============================================================================
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle Pydantic validation errors with user-friendly messages"""
+    errors = exc.errors()
+    error_messages = []
+    for error in errors:
+        field = " -> ".join(str(loc) for loc in error["loc"][1:])  # Skip 'body'
+        message = error["msg"]
+        error_messages.append(f"{field}: {message}")
+    
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": True,
+            "message": "Validation error: " + "; ".join(error_messages),
+            "status_code": 422
+        }
+    )
+
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
